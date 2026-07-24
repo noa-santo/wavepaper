@@ -112,7 +112,6 @@ func Watch(output string, ch chan<- WorkspaceMoved) error {
 			}
 			if err := json.Unmarshal(payload, &body); err == nil {
 				mu.Lock()
-				workspaces = map[uint64]workspace{}
 				for _, ws := range body.Workspaces {
 					workspaces[ws.ID] = ws
 				}

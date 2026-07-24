@@ -230,7 +230,7 @@ func run(svgPath, namespace, wantOutput string, params render.Params) error {
 	}()
 	go func() {
 		for m := range moves {
-			renderer.SetPanTarget(float64(m.Idx) * float64(outH))
+			renderer.SetPanTarget(float64(m.Idx) * float64(outH) * 0.1)
 		}
 	}()
 

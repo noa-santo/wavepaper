@@ -88,13 +88,18 @@ type Renderer struct {
 	params Params
 
 	outW, outH int
+	marginX    int // extra source pixels on each side, for the wave to sample into
 
 	panCurrent float64
 	panTarget  float64
 }
 
 func NewRenderer(src *Source, outW, outH int, params Params) *Renderer {
-	return &Renderer{src: src, outW: outW, outH: outH, params: params}
+	margin := (src.W - outW) / 2
+	if margin < 0 {
+		margin = 0
+	}
+	return &Renderer{src: src, outW: outW, outH: outH, marginX: margin, params: params}
 }
 
 // SetPanTarget sets the vertical pixel offset (into the source image) that
@@ -156,52 +161,29 @@ func (r *Renderer) Render(dst []byte, t float64) {
 
 		phase := float64(y)/wavelength + t*r.params.WaveSpeedHz
 		shift := r.params.WaveAmplitudePx * math.Sin(2*math.Pi*phase)
-		shiftMod := int(math.Round(shift)) % srcW
-		if shiftMod < 0 {
-			shiftMod += srcW
+		srcX := r.marginX + int(math.Round(shift))
+		if srcX < 0 {
+			srcX = 0
+		}
+		if maxX := srcW - r.outW; srcX > maxX {
+			srcX = maxX
 		}
 
-		srcRowOff := srcY * srcW * 3
+		srcRowOff := (srcY*srcW + srcX) * 3
 		dstRowOff := y * stride
 
-		// dst[x] = src[(x - shiftMod) mod srcW]; implemented as a row
-		// rotation using at most two contiguous copies instead of a
-		// per-pixel loop.
-		writeRotatedRow(dst[dstRowOff:dstRowOff+stride], r.src.Pix[srcRowOff:srcRowOff+srcW*3], srcW, r.outW, shiftMod)
+		convertRow(dst[dstRowOff:dstRowOff+stride], r.src.Pix[srcRowOff:srcRowOff+r.outW*3])
 	}
 }
 
-// writeRotatedRow fills dstRow (outW XRGB8888 pixels) by sampling srcRow
-// (srcW RGB pixels), rotated right by shiftMod pixels and tiled/clamped to
-// outW if the widths differ (they normally won't, since the source is
-// rasterized at the output's width).
-func writeRotatedRow(dstRow []byte, srcRow []byte, srcW, outW, shiftMod int) {
-	convert := func(dstOff, srcOff int) {
-		r := srcRow[srcOff+0]
-		g := srcRow[srcOff+1]
-		b := srcRow[srcOff+2]
-		dstRow[dstOff+0] = b
-		dstRow[dstOff+1] = g
-		dstRow[dstOff+2] = r
-		dstRow[dstOff+3] = 0xff
-	}
-
-	if outW == srcW {
-		// First shiftMod destination pixels come from the tail of the
-		// source row, the rest from the head — a rotate-right.
-		for x := 0; x < shiftMod; x++ {
-			convert(x*4, (srcW-shiftMod+x)*3)
-		}
-		for x := shiftMod; x < outW; x++ {
-			convert(x*4, (x-shiftMod)*3)
-		}
-		return
-	}
-
-	// Widths differ (unusual, e.g. multi-output with different scales
-	// sharing one Source): fall back to per-pixel modulo sampling.
-	for x := 0; x < outW; x++ {
-		sx := ((x-shiftMod)%srcW + srcW) % srcW
-		convert(x*4, sx*3)
+// convertRow copies one row of RGB source pixels into XRGB8888 dest pixels.
+func convertRow(dstRow []byte, srcRow []byte) {
+	for x := 0; x*3 < len(srcRow); x++ {
+		s := x * 3
+		d := x * 4
+		dstRow[d+0] = srcRow[s+2] // B
+		dstRow[d+1] = srcRow[s+1] // G
+		dstRow[d+2] = srcRow[s+0] // R
+		dstRow[d+3] = 0xff
 	}
 }

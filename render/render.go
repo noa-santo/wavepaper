@@ -21,11 +21,13 @@ import (
 	"os/exec"
 )
 
-// Source holds the rasterized wallpaper pixels in a simple, fast-to-index
-// row-major RGB layout (no alpha — the wallpaper is always opaque).
+// Source holds the rasterized wallpaper pixels pre-converted to XRGB8888 —
+// the same byte layout the Wayland buffer needs — so per-frame rendering is
+// just a copy() per row instead of a per-pixel format conversion.
 type Source struct {
 	W, H int
-	// Pix holds W*H*3 bytes, row-major, RGB order.
+	// Pix holds W*H*4 bytes, row-major, byte order B,G,R,X (matches
+	// wl_shm's little-endian XRGB8888).
 	Pix []byte
 }
 
@@ -51,15 +53,16 @@ func LoadSVG(path string, width int) (*Source, error) {
 func fromImage(img image.Image) *Source {
 	b := img.Bounds()
 	w, h := b.Dx(), b.Dy()
-	s := &Source{W: w, H: h, Pix: make([]byte, w*h*3)}
+	s := &Source{W: w, H: h, Pix: make([]byte, w*h*4)}
 	i := 0
 	for y := b.Min.Y; y < b.Max.Y; y++ {
 		for x := b.Min.X; x < b.Max.X; x++ {
 			r, g, bl, _ := img.At(x, y).RGBA()
-			s.Pix[i+0] = byte(r >> 8)
+			s.Pix[i+0] = byte(bl >> 8)
 			s.Pix[i+1] = byte(g >> 8)
-			s.Pix[i+2] = byte(bl >> 8)
-			i += 3
+			s.Pix[i+2] = byte(r >> 8)
+			s.Pix[i+3] = 0xff
+			i += 4
 		}
 	}
 	return s
@@ -106,15 +109,15 @@ func NewRenderer(src *Source, outW, outH int, params Params) *Renderer {
 // the renderer should ease toward. Callers are expected to compute this as
 // e.g. workspaceIdx * outputHeight; it gets clamped to the valid range here.
 func (r *Renderer) SetPanTarget(px float64) {
-	max := float64(r.src.H - r.outH)
-	if max < 0 {
-		max = 0
+	maxValue := float64(r.src.H - r.outH)
+	if maxValue < 0 {
+		maxValue = 0
 	}
 	if px < 0 {
 		px = 0
 	}
-	if px > max {
-		px = max
+	if px > maxValue {
+		px = maxValue
 	}
 	r.panTarget = px
 }
@@ -169,21 +172,9 @@ func (r *Renderer) Render(dst []byte, t float64) {
 			srcX = maxX
 		}
 
-		srcRowOff := (srcY*srcW + srcX) * 3
+		srcRowOff := (srcY*srcW + srcX) * 4
 		dstRowOff := y * stride
 
-		convertRow(dst[dstRowOff:dstRowOff+stride], r.src.Pix[srcRowOff:srcRowOff+r.outW*3])
-	}
-}
-
-// convertRow copies one row of RGB source pixels into XRGB8888 dest pixels.
-func convertRow(dstRow []byte, srcRow []byte) {
-	for x := 0; x*3 < len(srcRow); x++ {
-		s := x * 3
-		d := x * 4
-		dstRow[d+0] = srcRow[s+2] // B
-		dstRow[d+1] = srcRow[s+1] // G
-		dstRow[d+2] = srcRow[s+0] // R
-		dstRow[d+3] = 0xff
+		copy(dst[dstRowOff:dstRowOff+stride], r.src.Pix[srcRowOff:srcRowOff+stride])
 	}
 }

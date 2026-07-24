@@ -17,6 +17,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"time"
 
@@ -32,8 +33,8 @@ func main() {
 	svgPath := flag.String("svg", "", "path to the (tall) SVG wallpaper (required)")
 	namespace := flag.String("namespace", "wavepaper", "layer-shell namespace; must match your niri place-within-backdrop layer-rule")
 	outputName := flag.String("output", "", "wl_output name to render on (e.g. from `niri msg outputs`); default: first output seen")
-	amplitude := flag.Float64("wave-amplitude", 6, "wave horizontal displacement, in pixels")
-	wavelength := flag.Float64("wave-wavelength", 260, "wave vertical wavelength, in pixels")
+	amplitude := flag.Float64("wave-amplitude", 16, "wave horizontal displacement, in pixels")
+	wavelength := flag.Float64("wave-wavelength", 250, "wave vertical wavelength, in pixels")
 	waveSpeed := flag.Float64("wave-speed", 0.15, "wave cycles per second")
 	panSmoothing := flag.Float64("pan-smoothing", 0.25, "pan easing time constant, in seconds")
 	flag.Parse()
@@ -201,7 +202,8 @@ func run(svgPath, namespace, wantOutput string, params render.Params) error {
 
 	log.Printf("wavepaper: rendering %dx%d on output %q", outW, outH, outputName[target])
 
-	src, err := render.LoadSVG(svgPath, outW)
+	rasterWidth := outW + 2*int(math.Ceil(params.WaveAmplitudePx))
+	src, err := render.LoadSVG(svgPath, rasterWidth)
 	if err != nil {
 		return fmt.Errorf("loading %s: %w", svgPath, err)
 	}

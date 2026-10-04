@@ -44,7 +44,8 @@ Flags:
 | `--wave-wavelength`  | `260`        | Vertical distance for one full wave cycle, in pixels             |
 | `--wave-speed`       | `0.15`       | Wave cycles per second                                           |
 | `--pan-smoothing`    | `0.25`       | Pan easing time constant, in seconds (higher = lazier/softer)   |
-| `--idle-fps`         | `20`         | FPS limit while idle (not panning). To find the correct value for your other settings, slowly try out continuously smaller limits and pick the one where you can't see any stuttering. Doing this is recommended if you don't like wasting system recources :p |
+| `--idle-fps`         | `-1`         | FPS limit while idle (not panning). 0 disables the fps limit and -1 tries to calculate an okay value based on what how much time it needs to change noticably with the current settings. To fine tune value for your other settings and hardware, slowly try out continuously smaller limits and pick the lowest frame rate where you can't see any stuttering. |
+
 
 ## Required niri config
 

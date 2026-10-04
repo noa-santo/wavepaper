@@ -14,6 +14,7 @@
 package main
 
 import (
+	"runtime/debug"
 	"flag"
 	"fmt"
 	"log"
@@ -37,8 +38,9 @@ func main() {
 	wavelength := flag.Float64("wave-wavelength", 250, "wave vertical wavelength, in pixels")
 	waveSpeed := flag.Float64("wave-speed", 0.15, "wave cycles per second")
 	panSmoothing := flag.Float64("pan-smoothing", 0.25, "pan easing time constant, in seconds")
-	idleFPS := flag.Float64("idle-fps", 20, "max frame rate while only the wave is animating (0 = every vblank); full rate while the pan eases")
+	idleFPS := flag.Float64("idle-fps", -1, "max fps while only the wave animates; -1 = auto (1px/frame at the wave's fastest point), 0 = every vblank; full rate while the pan eases")
 	flag.Parse()
+
 
 	if *svgPath == "" {
 		fmt.Fprintln(os.Stderr, "wavepaper: --svg is required")
@@ -203,6 +205,14 @@ func run(svgPath, namespace, wantOutput string, idleFPS float64, params render.P
 
 	log.Printf("wavepaper: rendering %dx%d on output %q", outW, outH, outputName[target])
 
+	region, err := compositor.CreateRegion()
+	if err != nil {
+		return fmt.Errorf("create_region: %w", err)
+	}
+	must(region.Add(0, 0, int32(outW), int32(outH)))
+	must(surface.SetOpaqueRegion(region))
+	must(region.Destroy())
+
 	rasterWidth := outW + 2*int(math.Ceil(params.WaveAmplitudePx))
 	src, err := render.LoadSVG(svgPath, rasterWidth)
 	if err != nil {
@@ -216,6 +226,7 @@ func run(svgPath, namespace, wantOutput string, idleFPS float64, params render.P
 	if err != nil {
 		return fmt.Errorf("setting up shm buffers: %w", err)
 	}
+	debug.FreeOSMemory()
 
 	renderer := render.NewRenderer(src, outW, outH, params)
 
@@ -238,8 +249,11 @@ func run(svgPath, namespace, wantOutput string, idleFPS float64, params render.P
 	start := time.Now()
 	lastFrame := start
 	cur := 0
+	if idleFPS < 0 {
+        idleFPS = math.Max(1, math.Ceil(2*math.Pi*params.WaveAmplitudePx*params.WaveSpeedHz))
+	}
 	var idleInterval time.Duration
-	if idleFPS > 0 {
+	if idleFPS != 0 {
 		idleInterval = time.Duration(float64(time.Second) / idleFPS)
 	}	
 

@@ -37,6 +37,7 @@ func main() {
 	wavelength := flag.Float64("wave-wavelength", 250, "wave vertical wavelength, in pixels")
 	waveSpeed := flag.Float64("wave-speed", 0.15, "wave cycles per second")
 	panSmoothing := flag.Float64("pan-smoothing", 0.25, "pan easing time constant, in seconds")
+	idleFPS := flag.Float64("idle-fps", 20, "max frame rate while only the wave is animating (0 = every vblank); full rate while the pan eases")
 	flag.Parse()
 
 	if *svgPath == "" {
@@ -45,7 +46,7 @@ func main() {
 		os.Exit(2)
 	}
 
-	if err := run(*svgPath, *namespace, *outputName, render.Params{
+	if err := run(*svgPath, *namespace, *outputName, *idleFPS, render.Params{
 		WaveAmplitudePx:     *amplitude,
 		WaveWavelengthPx:    *wavelength,
 		WaveSpeedHz:         *waveSpeed,
@@ -61,7 +62,7 @@ type globalInfo struct {
 	version uint32
 }
 
-func run(svgPath, namespace, wantOutput string, params render.Params) error {
+func run(svgPath, namespace, wantOutput string, idleFPS float64, params render.Params) error {
 	display, err := client.Connect("")
 	if err != nil {
 		return fmt.Errorf("connecting to Wayland display: %w", err)
@@ -237,6 +238,10 @@ func run(svgPath, namespace, wantOutput string, params render.Params) error {
 	start := time.Now()
 	lastFrame := start
 	cur := 0
+	var idleInterval time.Duration
+	if idleFPS > 0 {
+		idleInterval = time.Duration(float64(time.Second) / idleFPS)
+	}	
 
 	var renderFrame func()
 	renderFrame = func() {
@@ -253,7 +258,14 @@ func run(svgPath, namespace, wantOutput string, params render.Params) error {
 		if err != nil {
 			log.Fatalf("wavepaper: surface.Frame: %v", err)
 		}
-		cb.SetDoneHandler(func(client.CallbackDoneEvent) { renderFrame() })
+		cb.SetDoneHandler(func(client.CallbackDoneEvent) {
+			if idleInterval > 0 && !renderer.Panning() {
+				if d := idleInterval - time.Since(lastFrame); d > 0 {
+					time.Sleep(d)
+				}
+			}	
+			renderFrame() 
+		})
 		must(surface.Commit())
 
 		cur = 1 - cur

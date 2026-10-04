@@ -133,6 +133,11 @@ func (r *Renderer) Advance(dt float64) {
 	r.panCurrent += (r.panTarget - r.panCurrent) * factor
 }
 
+// Panning reports whether the vertical pan is still visibly easing.
+func (r *Renderer) Panning() bool {
+	return math.Abs(r.panTarget-r.panCurrent) > 0.5
+}	
+
 // Render writes one XRGB8888 (little-endian, byte order B,G,R,X) frame into
 // dst, which must be at least outW*outH*4 bytes. t is the animation clock in
 // seconds (free-running, only used for the wave phase).

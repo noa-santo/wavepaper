@@ -14,12 +14,12 @@
 package main
 
 import (
-	"runtime/debug"
 	"flag"
 	"fmt"
 	"log"
 	"math"
 	"os"
+	"runtime/debug"
 	"time"
 
 	"github.com/rajveermalviya/go-wayland/wayland/client"
@@ -40,7 +40,6 @@ func main() {
 	panSmoothing := flag.Float64("pan-smoothing", 0.25, "pan easing time constant, in seconds")
 	idleFPS := flag.Float64("idle-fps", -1, "max fps while only the wave animates; -1 = auto (1px/frame at the wave's fastest point), 0 = every vblank; full rate while the pan eases")
 	flag.Parse()
-
 
 	if *svgPath == "" {
 		fmt.Fprintln(os.Stderr, "wavepaper: --svg is required")
@@ -250,12 +249,12 @@ func run(svgPath, namespace, wantOutput string, idleFPS float64, params render.P
 	lastFrame := start
 	cur := 0
 	if idleFPS < 0 {
-        idleFPS = math.Max(1, math.Ceil(2*math.Pi*params.WaveAmplitudePx*params.WaveSpeedHz))
+		idleFPS = math.Max(1, math.Ceil(2*math.Pi*params.WaveAmplitudePx*params.WaveSpeedHz))
 	}
 	var idleInterval time.Duration
 	if idleFPS != 0 {
 		idleInterval = time.Duration(float64(time.Second) / idleFPS)
-	}	
+	}
 
 	var renderFrame func()
 	renderFrame = func() {
@@ -277,8 +276,8 @@ func run(svgPath, namespace, wantOutput string, idleFPS float64, params render.P
 				if d := idleInterval - time.Since(lastFrame); d > 0 {
 					time.Sleep(d)
 				}
-			}	
-			renderFrame() 
+			}
+			renderFrame()
 		})
 		must(surface.Commit())
 

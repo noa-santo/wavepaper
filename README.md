@@ -66,24 +66,32 @@ Then add the following spawn-at-startup line with something like this:
 spawn-at-startup "wavepaper" "--svg" "/home/you/.config/wallpaper/blob.svg"
 ```
 
-## Packaging as a Nix package
-
-Sketch for your flake (adjust the source path to wherever you vendor this
-into your config repo):
+## Installing with NixOS:
 
 ```nix
-wavepaper = pkgs.buildGoModule {
-  pname = "wavepaper";
-  version = "0.1.0";
-  src = ./path/to/wavepaper;
-  vendorHash = null; 
-  nativeBuildInputs = [ pkgs.librsvg ]; 
-};
+{...}:
+let
+  wavepaper = pkgs.buildGoModule {
+    pname = "wavepaper";
+    version = "0.1.2";
+    src = pkgs.fetchFromGitHub {
+      owner = "noa-santo";
+      repo = "wavepaper";
+      rev = "8b62caec9ff24e4ec9537a8498cac99116b9eeff";
+      hash = "sha256-ytDhI2hYPj6aFgfIJ8gUi2X034vdyYCWR77R7Mp1fvc=";
+    };
+    vendorHash = "sha256-ncshoR0zAQGaJ8HowJi4CPyKluy/+1W0FQyGaIjS7dI=";
+    nativeBuildInputs = [ pkgs.librsvg ];
+  };
+in
+{
+  home.packages = [
+    wavepaper
+  ];
+}
 ```
 
-You'll want to `wrapProgram` it (or add `librsvg` to your home-manager
-package list, which you already have) so `rsvg-convert` is on `PATH` at
-runtime regardless of build-time deps.
+Then 
 
 ## Known limitations / next steps
 
